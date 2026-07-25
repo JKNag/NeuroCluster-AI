@@ -6,6 +6,9 @@ import {
   Calendar, Stethoscope 
 } from 'lucide-react';
 
+// Urgency Time Guard Component Import
+import UrgencyTimeGuard from './components/UrgencyTimeGuard';
+
 export default function App() {
   const [nodes, setNodes] = useState([]);
   const [overview, setOverview] = useState({});
@@ -15,11 +18,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [mriResult, setMriResult] = useState(null);
 
+  // Fetch Cluster Status with Automatic Polling
   useEffect(() => {
     const fetchCluster = async () => {
       try {
         const res = await axios.get('http://127.0.0.1:8000/api/cluster-status');
-        // নতুন ব্যাকএন্ড রেসপন্স স্ট্রাকচার অনু্যায়ী ডাটা সেট করা হচ্ছে
         setNodes(res.data.nodes || []);
         setOverview(res.data.overview || {});
       } catch (err) {
@@ -28,7 +31,7 @@ export default function App() {
     };
 
     fetchCluster();
-    const interval = setInterval(fetchCluster, 3000);
+    const interval = setInterval(fetchCluster, 2000); // 2-second cluster check interval
     return () => clearInterval(interval);
   }, []);
 
@@ -127,7 +130,10 @@ export default function App() {
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Server className="w-5 h-5 text-indigo-400" /> Live GPU Nodes (Scikit-Learn Health Guard)
             </h2>
-            <span className="text-xs text-slate-400">Auto-refreshing every 3s</span>
+            <span className="text-xs text-slate-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live Sync
+            </span>
           </div>
 
           {/* GPU Cards Grid */}
@@ -147,7 +153,7 @@ export default function App() {
                     <p className="text-xs text-slate-400">{node.name}</p>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    node.status === 'At Risk' ? 'bg-rose-500 text-white animate-pulse' : 'bg-emerald-500/20 text-emerald-400'
+                    node.status === 'At Risk' ? 'bg-rose-500 text-white animate-pulse' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                   }`}>
                     {node.status}
                   </span>
@@ -178,7 +184,7 @@ export default function App() {
             ))}
           </div>
 
-          {/* Optimal & Metrics Bar (এখন ব্যাকএন্ডের সাথে ডায়নামিক) */}
+          {/* Optimal & Metrics Bar */}
           <div className="grid grid-cols-3 gap-4 bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
             <div>
               <p className="text-xs text-slate-400">Priority Preemption Rate</p>
@@ -201,6 +207,10 @@ export default function App() {
               </p>
             </div>
           </div>
+
+          {/* URGENCY TIME GUARD MODULE */}
+          <UrgencyTimeGuard />
+
         </div>
 
         {/* Right Section: Upload Form & Report Box */}
@@ -228,7 +238,7 @@ export default function App() {
                 <select 
                   value={scanType} 
                   onChange={(e) => setScanType(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg p-2.5 outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg p-2.5 outline-none focus:border-indigo-500 cursor-pointer"
                 >
                   <option value="Urgent">🚨 Urgent (Stroke / Trauma - High Priority)</option>
                   <option value="Routine">🔵 Routine (Batch Research Processing)</option>
@@ -238,7 +248,7 @@ export default function App() {
               <button 
                 type="submit" 
                 disabled={loading || !selectedFile}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-lg transition flex justify-center items-center gap-2 disabled:opacity-50"
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-lg transition flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -320,7 +330,7 @@ export default function App() {
                   {/* Single Print Button */}
                   <button 
                     onClick={handlePrint}
-                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded transition flex items-center gap-1.5 text-xs font-medium border border-slate-700 print:hidden"
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded transition flex items-center gap-1.5 text-xs font-medium border border-slate-700 print:hidden cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" /> Print
                   </button>
