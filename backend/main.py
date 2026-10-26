@@ -31,7 +31,7 @@ jobs_db = [
         "patient_name": "Emergency Acute Stroke", 
         "scan_type": "urgent", 
         "target_time_sec": 30, 
-        "start_timestamp": time.time() - 24, # 24s elapsed (Triggers Risk Warning)
+        "start_timestamp": time.time() - 24, # 24s elapsed
         "status": "running", 
         "gpu_assigned": "GPU-Node-01"
     },
@@ -84,7 +84,8 @@ except Exception as e:
 def home():
     return {"status": "NeuroCluster AI Backend Running with Urgency Time Guard"}
 
-# 2. Cluster Status API
+# 2. Cluster Status API (Real-World Event Driven Load Tracking)
+# 2. Cluster Status API (Balanced Dynamic Load Rotation)
 @app.get("/api/cluster-status")
 def get_cluster_status():
     global last_urgent_job_time
@@ -100,20 +101,28 @@ def get_cluster_status():
     
     nodes = []
 
+    # Prottek 10 second por por automatic load rotate korbe, jate shob node ekshathe red na hoy
+    heavy_idx = int(current_time // 10) % 3
+
     for idx, config in enumerate(node_configs):
-        if is_rebalancing and idx == 1:
-            temp = int(np.random.normal(86, 2))
-            vram = f"{np.random.randint(90, 98)}%"
-            fan_speed = f"{np.random.randint(95, 100)}%"
-            status = "At Risk"
+        node_id = config["id"]
+        
+        # Rebalancing ba time-based rotation-er shomoy shudhu designated node-i heavy load hobe
+        is_node_at_risk = (is_rebalancing and idx == 0) or (idx == heavy_idx)
+
+        if is_node_at_risk:
+            temp = int(np.random.normal(84, 2))
+            vram = f"{np.random.randint(91, 98)}%"
+            fan_speed = f"{np.random.randint(94, 100)}%"
+            status = "Heavy Load (Critical)"
         else:
-            temp = int(np.random.normal(62, 3))
-            vram = f"{np.random.randint(30, 60)}%"
-            fan_speed = f"{np.random.randint(45, 70)}%"
+            temp = int(np.random.normal(61, 2))
+            vram = f"{np.random.randint(30, 52)}%"
+            fan_speed = f"{np.random.randint(44, 65)}%"
             status = "Healthy"
 
         nodes.append({
-            "id": config["id"],
+            "id": node_id,
             "name": config["name"],
             "temp": temp,
             "vram": vram,
@@ -122,9 +131,9 @@ def get_cluster_status():
         })
 
     overview = {
-        "preemption_rate": f"< {round(random.uniform(1.4, 1.9), 1)}s" if is_rebalancing else f"< {round(random.uniform(0.8, 1.1), 1)}s",
-        "idle_gpu_saved": f"{round(random.uniform(37.2, 39.8), 1)}%",
-        "cluster_status": "Degraded (Rebalancing)" if is_rebalancing else "Optimal"
+        "preemption_rate": f"< {round(random.uniform(1.4, 1.8), 1)}s" if is_rebalancing else f"< {round(random.uniform(0.8, 1.0), 1)}s",
+        "idle_gpu_saved": f"{round(random.uniform(37.5, 39.5), 1)}%",
+        "cluster_status": "Rebalancing & Preempting" if is_rebalancing else ("High Compute Load" if any(n["status"] == "Heavy Load (Critical)" for n in nodes) else "Optimal")
     }
 
     return {
@@ -159,6 +168,8 @@ async def process_mri(file: UploadFile = File(...), scan_type: str = "Urgent"):
     processing_time = round(time.time() - start_time, 2)
     
     new_job_id = f"JOB-{random.randint(200, 999)}"
+    target_node = "GPU-Node-01" if scan_type.lower() == "urgent" else "GPU-Node-03"
+    
     jobs_db.insert(0, {
         "id": new_job_id,
         "patient_name": f"Scan: {file.filename}",
@@ -166,14 +177,14 @@ async def process_mri(file: UploadFile = File(...), scan_type: str = "Urgent"):
         "target_time_sec": 30 if scan_type.lower() == "urgent" else 90,
         "start_timestamp": time.time(),
         "status": "running",
-        "gpu_assigned": "GPU-Node-01" if scan_type.lower() == "urgent" else "GPU-Node-03"
+        "gpu_assigned": target_node
     })
 
     return {
         "status": "success",
         "filename": file.filename,
         "scan_type": scan_type,
-        "allocated_gpu": "GPU-Node-01 (High Priority Cluster)" if scan_type.lower() == "urgent" else "GPU-Node-03 (Batch Processing)",
+        "allocated_gpu": f"{target_node} (High Priority Cluster)" if scan_type.lower() == "urgent" else f"{target_node} (Batch Processing)",
         "processing_time_sec": processing_time,
         "mri_ai_result": {
             "label": label,
@@ -182,12 +193,11 @@ async def process_mri(file: UploadFile = File(...), scan_type: str = "Urgent"):
     }
 
 # =====================================================================
-# 4. URGENCY TIME GUARD MODULE APIs (UPDATED FOR LATE RISK ACTION)
+# 4. URGENCY TIME GUARD MODULE APIs
 # =====================================================================
 
 @app.get("/api/time-guard/jobs")
 def get_time_guard_jobs():
-    """Calculates real-time elapsed seconds and checks Late Risk Warning status"""
     current_now = time.time()
     formatted_jobs = []
 
@@ -197,7 +207,6 @@ def get_time_guard_jobs():
         else:
             elapsed = job.get("frozen_elapsed", 45)
 
-        # Late Risk Warning: Urgent scan within 8 seconds of target time
         is_at_risk = (
             job["scan_type"] == "urgent" 
             and elapsed >= (job["target_time_sec"] - 8) 
@@ -220,10 +229,6 @@ def get_time_guard_jobs():
 
 @app.post("/api/time-guard/rescue-urgent")
 def rescue_urgent_job():
-    """
-    FEATURE: Late Risk Action & Preemption Swap.
-    Pauses a running research job, frees GPU, resets urgent scan timer, and logs the swap.
-    """
     global last_urgent_job_time
     last_urgent_job_time = time.time()
 
@@ -231,16 +236,13 @@ def rescue_urgent_job():
     urgent_job = next((j for j in jobs_db if j["scan_type"] == "urgent" and j["status"] == "running"), None)
 
     if research_job and urgent_job:
-        # 1. Pause Research Job & Freeze Time
         research_job["status"] = "PAUSED (GPU Freed)"
         research_job["frozen_elapsed"] = int(time.time() - research_job["start_timestamp"])
         freed_gpu = research_job["gpu_assigned"]
 
-        # 2. Re-allocate GPU and Reset Urgent Job Timer
         urgent_job["gpu_assigned"] = f"{freed_gpu} (Rescued)"
-        urgent_job["start_timestamp"] = time.time() - 5 # Reset elapsed to ~5s
+        urgent_job["start_timestamp"] = time.time() - 5
 
-        # 3. Record Swap Log History
         log_entry = {
             "id": len(swap_logs) + 1,
             "timestamp": time.strftime("%H:%M:%S"),
@@ -251,7 +253,6 @@ def rescue_urgent_job():
         }
         swap_logs.insert(0, log_entry)
 
-        # 4. Record in Missed Target Reasons Database
         missed_reasons_db.insert(0, {
             "job_id": research_job["id"],
             "class": "Research",
@@ -271,7 +272,6 @@ def rescue_urgent_job():
 
 @app.post("/api/record-swap")
 def record_manual_swap(data: SwapRecord):
-    """Direct API to record swap events from frontend interactions"""
     entry = {
         "id": len(swap_logs) + 1,
         "timestamp": time.strftime("%H:%M:%S"),
@@ -285,9 +285,6 @@ def record_manual_swap(data: SwapRecord):
 
 @app.get("/api/time-guard/report")
 def get_ontime_report():
-    """
-    FEATURE: Dynamic On-Time Delivery Report, Recorded Swap Logs & Missed Targets.
-    """
     urgent_count = len([j for j in jobs_db if j.get('scan_type') == 'urgent'])
     
     return {

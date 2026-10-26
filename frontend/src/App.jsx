@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Activity, Server, AlertTriangle, Upload, Shield, Cpu, 
@@ -6,7 +6,6 @@ import {
   Calendar, Stethoscope 
 } from 'lucide-react';
 
-// Urgency Time Guard Component Import
 import UrgencyTimeGuard from './components/UrgencyTimeGuard';
 
 export default function App() {
@@ -18,7 +17,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [mriResult, setMriResult] = useState(null);
 
-  // Fetch Cluster Status with Automatic Polling
   useEffect(() => {
     const fetchCluster = async () => {
       try {
@@ -31,7 +29,7 @@ export default function App() {
     };
 
     fetchCluster();
-    const interval = setInterval(fetchCluster, 2000); // 2-second cluster check interval
+    const interval = setInterval(fetchCluster, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -104,7 +102,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans print:bg-[#fdfbf7] print:text-slate-900 print:p-0">
       
-      {/* Header (Hidden on Print) */}
+      {/* Header */}
       <header className="flex justify-between items-center border-b border-slate-800 pb-4 mb-8 print:hidden">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-600/30">
@@ -124,11 +122,11 @@ export default function App() {
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:block">
         
-        {/* Left Section: Live GPU Nodes & Cluster Status Bar (Hidden on Print) */}
+        {/* Left Section */}
         <div className="lg:col-span-2 space-y-6 print:hidden">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Server className="w-5 h-5 text-indigo-400" /> Live GPU Nodes (Scikit-Learn Health Guard)
+              <Server className="w-5 h-5 text-indigo-400" /> Live GPU Nodes
             </h2>
             <span className="text-xs text-slate-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -138,53 +136,60 @@ export default function App() {
 
           {/* GPU Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {nodes.map((node) => (
-              <div 
-                key={node.id} 
-                className={`p-4 rounded-xl border transition-all duration-300 ${
-                  node.status === 'At Risk' 
-                    ? 'bg-rose-950/20 border-rose-500/50 shadow-lg shadow-rose-950/50' 
-                    : 'bg-slate-900 border-slate-800'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-200">{node.id}</h3>
-                    <p className="text-xs text-slate-400">{node.name}</p>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    node.status === 'At Risk' ? 'bg-rose-500 text-white animate-pulse' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  }`}>
-                    {node.status}
-                  </span>
-                </div>
+            {nodes.map((node) => {
+              const isHeavyOrAtRisk = node.status?.includes('Heavy') || node.status === 'At Risk' || node.temp > 80;
 
-                <div className="space-y-2 text-xs text-slate-300">
-                  <div className="flex justify-between">
-                    <span>Temperature:</span>
-                    <span className={node.temp > 80 ? 'text-rose-400 font-bold' : 'text-slate-100'}>{node.temp}°C</span>
+              return (
+                <div 
+                  key={node.id} 
+                  className={`p-4 rounded-xl border transition-all duration-300 ${
+                    isHeavyOrAtRisk 
+                      ? 'bg-rose-950/30 border-rose-500 shadow-lg shadow-rose-950/60 ring-1 ring-rose-500/50' 
+                      : 'bg-slate-900 border-slate-800'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-200">{node.id}</h3>
+                      <p className="text-xs text-slate-400">{node.name}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      isHeavyOrAtRisk ? 'bg-rose-600 text-white animate-pulse' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    }`}>
+                      {node.status}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>VRAM Usage:</span>
-                    <span>{node.vram}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Fan Speed:</span>
-                    <span>{node.fan_speed}</span>
-                  </div>
-                </div>
 
-                {node.status === 'At Risk' && (
-                  <div className="mt-3 p-2 bg-rose-500/10 border border-rose-500/30 rounded text-[11px] text-rose-300 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>Scikit-learn Alert: Migrating Jobs!</span>
+                  <div className="space-y-2 text-xs text-slate-300">
+                    <div className="flex justify-between">
+                      <span>Temperature:</span>
+                      <span className={node.temp > 80 ? 'text-rose-400 font-bold' : 'text-slate-100'}>{node.temp}°C</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>VRAM Usage:</span>
+                      <span className={parseInt(node.vram) > 85 ? 'text-rose-400 font-bold' : 'text-slate-100'}>{node.vram}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Fan Speed:</span>
+                      <span>{node.fan_speed}</span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {isHeavyOrAtRisk && (
+                    <div className="mt-3 p-2 bg-rose-500/10 border border-rose-500/30 rounded text-[11px] text-rose-300 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                        <span>High Compute Contention</span>
+                      </div>
+                      <span className="text-[9px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-mono font-bold tracking-wider">BLOCKED</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Optimal & Metrics Bar */}
+          {/* Metrics Bar */}
           <div className="grid grid-cols-3 gap-4 bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
             <div>
               <p className="text-xs text-slate-400">Priority Preemption Rate</p>
@@ -201,22 +206,21 @@ export default function App() {
             <div>
               <p className="text-xs text-slate-400">Cluster Status</p>
               <p className={`text-xl font-bold mt-1 ${
-                overview.cluster_status?.includes('Degraded') ? 'text-rose-400 animate-pulse' : 'text-cyan-400'
+                overview.cluster_status?.includes('Rebalancing') || overview.cluster_status?.includes('High') ? 'text-rose-400 animate-pulse' : 'text-cyan-400'
               }`}>
                 {overview.cluster_status || "Optimal"}
               </p>
             </div>
           </div>
 
-          {/* URGENCY TIME GUARD MODULE */}
+          {/* Urgency Time Guard Module */}
           <UrgencyTimeGuard />
 
         </div>
 
-        {/* Right Section: Upload Form & Report Box */}
+        {/* Right Section */}
         <div className="space-y-4">
           
-          {/* Upload Form Box (Hidden on Print) */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 print:hidden">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Activity className="w-5 h-5 text-indigo-400" /> MRI Workload Execution
@@ -263,17 +267,15 @@ export default function App() {
             </form>
           </div>
 
-          {/* REPORT & PRINT AREA */}
+          {/* Diagnostic Report Area */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 relative overflow-hidden print:bg-[#fdfbf7] print:border-none print:p-6 print:text-slate-900 print:shadow-none">
             
-            {/* Background Watermark (Only visible when printing) */}
             <div className="hidden print:flex absolute inset-0 items-center justify-center pointer-events-none opacity-[0.05] z-0 select-none">
               <h1 className="text-6xl font-black rotate-[-30deg] text-indigo-950 tracking-widest uppercase">
                 NEUROCLUSTER AI
               </h1>
             </div>
 
-            {/* Print Only Header with Name and Logo */}
             <div className="hidden print:flex justify-between items-center border-b-2 border-slate-300 pb-3 mb-4 relative z-10">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-indigo-600 text-white rounded-lg">
@@ -291,7 +293,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Image Inspection Window */}
             {previewUrl && (
               <div className="space-y-2 relative z-10">
                 <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 print:text-slate-800">
@@ -318,7 +319,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Diagnostic Details */}
             {mriResult ? (
               <div className="p-4 bg-slate-950 border border-slate-800 rounded-lg space-y-3 text-xs border-l-4 border-l-indigo-500 print:bg-white print:border-slate-300 print:p-4 print:shadow-none relative z-10">
                 
@@ -327,7 +327,6 @@ export default function App() {
                     <FileText className="w-4 h-4 text-indigo-400 print:text-slate-700" /> Patient Diagnostic Report
                   </span>
                   
-                  {/* Single Print Button */}
                   <button 
                     onClick={handlePrint}
                     className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded transition flex items-center gap-1.5 text-xs font-medium border border-slate-700 print:hidden cursor-pointer"
@@ -336,7 +335,6 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Patient Meta Data */}
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded border border-slate-800 print:bg-amber-50/50 print:border-amber-200/80 print:text-slate-800">
                   <div className="flex items-center gap-1">
                     <User className="w-3.5 h-3.5 text-slate-500 print:text-indigo-600" />
@@ -348,13 +346,11 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* File Logs */}
                 <div className="space-y-1 text-slate-400 print:text-slate-700 text-[11px]">
                   <p>File Name: <span className="text-slate-200 print:text-slate-900 font-medium">{mriResult.filename}</span></p>
                   <p>Processed By: <span className="text-indigo-400 font-medium print:text-indigo-800">{mriResult.allocated_gpu}</span> ({mriResult.processing_time_sec}s)</p>
                 </div>
 
-                {/* AI Model Diagnosis Box */}
                 <div className="p-3 bg-slate-900 rounded border border-slate-800 space-y-2 print:bg-rose-50/80 print:border-rose-200">
                   <div className="flex justify-between items-center">
                     <span className="text-[11px] text-slate-300 font-semibold flex items-center gap-1 print:text-slate-800">
@@ -377,13 +373,11 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Recommendation Box */}
                 <div className="p-2.5 bg-indigo-950/30 border border-indigo-500/30 rounded text-[11px] print:bg-emerald-50 print:border-emerald-200">
                   <p className="text-indigo-300 font-semibold print:text-emerald-900">Recommendation:</p>
                   <p className="text-slate-300 text-[10px] mt-0.5 print:text-emerald-800">{mriResult.recommendation}</p>
                 </div>
 
-                {/* Print Only Footer */}
                 <div className="hidden print:block text-center text-[9px] text-slate-400 pt-3 border-t border-slate-200">
                   Automated Medical Diagnosis Report Generated by NeuroCluster AI Orchestrator
                 </div>
