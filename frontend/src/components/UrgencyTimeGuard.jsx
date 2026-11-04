@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldAlert, Zap, AlertCircle, RefreshCw, AlertTriangle, Clock, Layers } from 'lucide-react';
 
 export default function UrgencyTimeGuard() {

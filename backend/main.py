@@ -2,7 +2,7 @@ import io
 import time
 import random
 from PIL import Image
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from transformers import pipeline
 import sklearn
@@ -80,6 +80,25 @@ try:
 except Exception as e:
     print(f"Error loading Hugging Face model: {e}")
 
+# Shared helpers: read an uploaded image and run the classifier
+async def read_image(file: UploadFile) -> Image.Image:
+    contents = await file.read()
+    try:
+        return Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image file. Please upload a JPG or PNG MRI image.")
+
+def classify_image(image: Image.Image):
+    label, confidence = "no_tumor", 0.95
+    if mri_classifier:
+        try:
+            top_prediction = mri_classifier(image)[0]
+            label = top_prediction["label"]
+            confidence = top_prediction["score"]
+        except Exception as e:
+            print(f"Prediction Error: {e}")
+    return label, confidence
+
 @app.get("/")
 def home():
     return {"status": "NeuroCluster AI Backend Running with Urgency Time Guard"}
@@ -150,21 +169,9 @@ async def process_mri(file: UploadFile = File(...), scan_type: str = "Urgent"):
     if scan_type.lower() == "urgent":
         last_urgent_job_time = time.time()
     
-    contents = await file.read()
-    image = Image.open(io.BytesIO(contents)).convert("RGB")
+    image = await read_image(file)
+    label, confidence = classify_image(image)
     
-    label = "no_tumor"
-    confidence = 0.95
-    
-    if mri_classifier:
-        try:
-            predictions = mri_classifier(image)
-            top_prediction = predictions[0]
-            label = top_prediction['label']
-            confidence = top_prediction['score']
-        except Exception as e:
-            print(f"Prediction Error: {e}")
-
     processing_time = round(time.time() - start_time, 2)
     
     new_job_id = f"JOB-{random.randint(200, 999)}"
@@ -186,6 +193,26 @@ async def process_mri(file: UploadFile = File(...), scan_type: str = "Urgent"):
         "scan_type": scan_type,
         "allocated_gpu": f"{target_node} (High Priority Cluster)" if scan_type.lower() == "urgent" else f"{target_node} (Batch Processing)",
         "processing_time_sec": processing_time,
+        "mri_ai_result": {
+            "label": label,
+            "confidence": float(confidence)
+        }
+    }
+
+
+# 3b. Patient Portal API (outside patients: analysis only, does not use the hospital SLA queue,
+#     and does not store the image or any patient details)
+@app.post("/api/patient/analyze-mri")
+async def patient_analyze_mri(file: UploadFile = File(...)):
+    start_time = time.time()
+    image = await read_image(file)
+    label, confidence = classify_image(image)
+
+    return {
+        "status": "success",
+        "filename": file.filename,
+        "scan_type": "patient-portal",
+        "processing_time_sec": round(time.time() - start_time, 2),
         "mri_ai_result": {
             "label": label,
             "confidence": float(confidence)

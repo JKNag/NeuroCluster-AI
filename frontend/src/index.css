@@ -1,6 +1,21 @@
 @import "tailwindcss";
 
+@theme {
+  --font-bangla: "Noto Sans Bengali", "Kalpurush", "SolaimanLipi", sans-serif;
+}
+
 body {
   margin: 0;
   background-color: #020617;
+}
+
+/* Print: only the report paper is shown */
+@media print {
+  body { background: #fff !important; }
+  #report-print-area {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+  @page { size: A4; margin: 12mm; }
 }
